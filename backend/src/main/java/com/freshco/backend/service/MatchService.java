@@ -25,9 +25,11 @@ public class MatchService {
     private final MatchRepository matchRepository;
     private final SportRepository sportRepository;
     private final TeamRepository teamRepository;
+    private final StandingService standingService;
 
     @Transactional(readOnly = true)
     public List<MatchResponse> getAllMatches() {
+
         return matchRepository.findAll()
                 .stream()
                 .map(this::toResponse)
@@ -46,7 +48,9 @@ public class MatchService {
     public List<MatchResponse> getLiveMatches() {
 
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(MatchStatus.LIVE)
+                .findByStatusOrderByScheduledAtAsc(
+                        MatchStatus.LIVE
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -56,17 +60,22 @@ public class MatchService {
     public List<MatchResponse> getUpcomingMatches() {
 
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(MatchStatus.UPCOMING)
+                .findByStatusOrderByScheduledAtAsc(
+                        MatchStatus.UPCOMING
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
+
     @Transactional(readOnly = true)
     public List<MatchResponse> getCompletedMatches() {
 
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(MatchStatus.COMPLETED)
+                .findByStatusOrderByScheduledAtAsc(
+                        MatchStatus.COMPLETED
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -76,10 +85,13 @@ public class MatchService {
     public List<MatchResponse> getMatchesBySport(Long sportId) {
 
         if (!sportRepository.existsById(sportId)) {
-            throw new RuntimeException("Sport not found with id: " + sportId);
+            throw new RuntimeException(
+                    "Sport not found with id: " + sportId
+            );
         }
 
-        return matchRepository.findBySportIdOrderByScheduledAtAsc(sportId)
+        return matchRepository
+                .findBySportIdOrderByScheduledAtAsc(sportId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -89,7 +101,9 @@ public class MatchService {
     public List<MatchResponse> getLiveMatchesBySport(Long sportId) {
 
         if (!sportRepository.existsById(sportId)) {
-            throw new RuntimeException("Sport not found with id: " + sportId);
+            throw new RuntimeException(
+                    "Sport not found with id: " + sportId
+            );
         }
 
         return matchRepository
@@ -102,44 +116,122 @@ public class MatchService {
                 .toList();
     }
 
-    public MatchResponse createMatch(MatchCreateRequest request) {
+    public MatchResponse createMatch(
+            MatchCreateRequest request
+    ) {
 
-        Sport sport = sportRepository.findById(request.sportId())
+        Sport sport = sportRepository
+                .findById(request.sportId())
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Sport not found with id: " + request.sportId()
+                                "Sport not found with id: "
+                                        + request.sportId()
                         )
                 );
 
-        Team teamA = teamRepository.findById(request.teamAId())
+        Team teamA = teamRepository
+                .findById(request.teamAId())
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Team A not found with id: " + request.teamAId()
+                                "Team A not found with id: "
+                                        + request.teamAId()
                         )
                 );
 
-        Team teamB = teamRepository.findById(request.teamBId())
+        Team teamB = teamRepository
+                .findById(request.teamBId())
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Team B not found with id: " + request.teamBId()
+                                "Team B not found with id: "
+                                        + request.teamBId()
                         )
                 );
 
-        validateTeams(sport, teamA, teamB);
+        validateTeams(
+                sport,
+                teamA,
+                teamB
+        );
 
         Match match = Match.builder()
                 .sport(sport)
                 .teamA(teamA)
                 .teamB(teamB)
+                .scoreA("0")
+                .scoreB("0")
                 .venue(request.venue())
                 .roundName(request.roundName())
                 .scheduledAt(request.scheduledAt())
-                .scoreA("0")
-                .scoreB("0")
                 .status(MatchStatus.UPCOMING)
+                .winner(null)
                 .build();
 
-        return toResponse(matchRepository.save(match));
+        Match savedMatch = matchRepository.save(match);
+
+        return toResponse(savedMatch);
+    }
+
+    public MatchResponse updateMatch(
+            Long id,
+            MatchCreateRequest request
+    ) {
+
+        Match match = findMatch(id);
+
+        Sport sport = sportRepository
+                .findById(request.sportId())
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Sport not found with id: "
+                                        + request.sportId()
+                        )
+                );
+
+        Team teamA = teamRepository
+                .findById(request.teamAId())
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Team A not found with id: "
+                                        + request.teamAId()
+                        )
+                );
+
+        Team teamB = teamRepository
+                .findById(request.teamBId())
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Team B not found with id: "
+                                        + request.teamBId()
+                        )
+                );
+
+        validateTeams(
+                sport,
+                teamA,
+                teamB
+        );
+
+        if (match.getStatus() == MatchStatus.LIVE
+                || match.getStatus() == MatchStatus.COMPLETED) {
+
+            if (!match.getSport().getId().equals(sport.getId())
+                    || !match.getTeamA().getId().equals(teamA.getId())
+                    || !match.getTeamB().getId().equals(teamB.getId())) {
+
+                throw new IllegalStateException(
+                        "Cannot change sport or teams of a live/completed match"
+                );
+            }
+        }
+
+        match.setSport(sport);
+        match.setTeamA(teamA);
+        match.setTeamB(teamB);
+        match.setVenue(request.venue());
+        match.setRoundName(request.roundName());
+        match.setScheduledAt(request.scheduledAt());
+
+        return toResponse(match);
     }
 
     public MatchResponse updateScore(
@@ -174,14 +266,19 @@ public class MatchService {
 
         Match match = findMatch(id);
 
+        MatchStatus oldStatus = match.getStatus();
         MatchStatus newStatus = request.status();
+
+        validateStatusTransition(
+                oldStatus,
+                newStatus
+        );
 
         if (newStatus == MatchStatus.COMPLETED) {
 
             if (request.winnerTeamId() != null) {
 
                 Long winnerId = request.winnerTeamId();
-
                 if (!winnerId.equals(match.getTeamA().getId())
                         && !winnerId.equals(match.getTeamB().getId())) {
 
@@ -190,7 +287,8 @@ public class MatchService {
                     );
                 }
 
-                Team winner = teamRepository.findById(winnerId)
+                Team winner = teamRepository
+                        .findById(winnerId)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Winner team not found"
@@ -200,70 +298,48 @@ public class MatchService {
                 match.setWinner(winner);
 
             } else {
-                // Draw / no winner
                 match.setWinner(null);
             }
-        } else {
+        }
+
+        else {
             match.setWinner(null);
         }
 
         match.setStatus(newStatus);
 
-        return toResponse(match);
-    }
+        if (oldStatus == MatchStatus.COMPLETED
+                || newStatus == MatchStatus.COMPLETED) {
 
-    public MatchResponse updateMatch(
-            Long id,
-            MatchCreateRequest request
-    ) {
-
-        Match match = findMatch(id);
-
-        Sport sport = sportRepository.findById(request.sportId())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Sport not found with id: " + request.sportId()
-                        )
-                );
-
-        Team teamA = teamRepository.findById(request.teamAId())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Team A not found with id: " + request.teamAId()
-                        )
-                );
-
-        Team teamB = teamRepository.findById(request.teamBId())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Team B not found with id: " + request.teamBId()
-                        )
-                );
-
-        validateTeams(sport, teamA, teamB);
-
-        match.setSport(sport);
-        match.setTeamA(teamA);
-        match.setTeamB(teamB);
-        match.setVenue(request.venue());
-        match.setRoundName(request.roundName());
-        match.setScheduledAt(request.scheduledAt());
+            standingService.recalculateStandings(
+                    match.getSport().getId()
+            );
+        }
 
         return toResponse(match);
     }
+
 
     public void deleteMatch(Long id) {
 
-        if (!matchRepository.existsById(id)) {
-            throw new RuntimeException("Match not found with id: " + id);
-        }
+        Match match = findMatch(id);
 
-        matchRepository.deleteById(id);
+        Long sportId = match.getSport().getId();
+
+        boolean wasCompleted =
+                match.getStatus() == MatchStatus.COMPLETED;
+
+        matchRepository.delete(match);
+
+        if (wasCompleted) {
+            standingService.recalculateStandings(sportId);
+        }
     }
 
     private Match findMatch(Long id) {
 
-        return matchRepository.findById(id)
+        return matchRepository
+                .findById(id)
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Match not found with id: " + id
@@ -278,50 +354,87 @@ public class MatchService {
     ) {
 
         if (teamA.getId().equals(teamB.getId())) {
+
             throw new IllegalArgumentException(
                     "A team cannot play against itself"
             );
         }
 
+
         if (!teamA.getSport().getId().equals(sport.getId())) {
+
             throw new IllegalArgumentException(
                     "Team A does not belong to this sport"
             );
         }
 
         if (!teamB.getSport().getId().equals(sport.getId())) {
+
             throw new IllegalArgumentException(
                     "Team B does not belong to this sport"
             );
         }
     }
 
+
+    private void validateStatusTransition(
+            MatchStatus oldStatus,
+            MatchStatus newStatus
+    ) {
+
+        if (oldStatus == newStatus) {
+            return;
+        }
+
+
+        if (oldStatus == MatchStatus.CANCELLED
+                && newStatus != MatchStatus.UPCOMING) {
+
+            throw new IllegalStateException(
+                    "A cancelled match can only be reopened as UPCOMING"
+            );
+        }
+    }
+
+
     private MatchResponse toResponse(Match match) {
 
         Team winner = match.getWinner();
 
         return new MatchResponse(
+
                 match.getId(),
 
+                // Sport
                 match.getSport().getId(),
                 match.getSport().getName(),
 
+                // Team A
                 match.getTeamA().getId(),
                 match.getTeamA().getName(),
                 match.getScoreA(),
 
+                // Team B
                 match.getTeamB().getId(),
                 match.getTeamB().getName(),
                 match.getScoreB(),
 
+                // Match metadata
                 match.getVenue(),
                 match.getRoundName(),
                 match.getScheduledAt(),
 
+                // Status
                 match.getStatus(),
 
-                winner != null ? winner.getId() : null,
-                winner != null ? winner.getName() : null
+                // Winner
+                winner != null
+                        ? winner.getId()
+                        : null,
+
+                winner != null
+                        ? winner.getName()
+                        : null
         );
     }
 }
