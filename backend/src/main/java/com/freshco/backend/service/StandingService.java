@@ -39,13 +39,11 @@ public class StandingService {
             );
         }
 
-        List<Standing> standings =
-                standingRepository.findByTeamSportId(sportId);
-
-        standings = standings.stream()
+        List<Standing> standings = standingRepository
+                .findByTeamSportId(sportId)
+                .stream()
                 .sorted(
-                        Comparator
-                                .comparing(
+                        Comparator.comparing(
                                         Standing::getPoints,
                                         Comparator.reverseOrder()
                                 )
@@ -58,19 +56,14 @@ public class StandingService {
                                         Comparator.reverseOrder()
                                 )
                                 .thenComparing(
-                                        standing ->
-                                                standing
-                                                        .getTeam()
-                                                        .getName()
+                                        standing -> standing.getTeam().getName()
                                 )
                 )
                 .toList();
 
-        List<StandingResponse> response =
-                new ArrayList<>();
+        List<StandingResponse> response = new ArrayList<>();
 
         for (int i = 0; i < standings.size(); i++) {
-
             Standing standing = standings.get(i);
 
             response.add(
@@ -99,29 +92,25 @@ public class StandingService {
                         )
                 );
 
-        List<Team> teams =
-                teamRepository.findBySportId(sportId);
+        List<Team> teams = teamRepository.findBySportId(sportId);
 
         List<Match> completedMatches =
-                matchRepository
-                        .findBySportIdAndStatusOrderByScheduledAtAsc(
-                                sportId,
-                                MatchStatus.COMPLETED
-                        );
+                matchRepository.findBySportIdAndStatusOrderByScheduledAtAsc(
+                        sportId,
+                        MatchStatus.COMPLETED
+                );
 
-        Map<Long, Standing> standings =
-                new HashMap<>();
+        Map<Long, Standing> standings = new HashMap<>();
 
         for (Team team : teams) {
 
-            Standing standing =
-                    standingRepository
-                            .findByTeamId(team.getId())
-                            .orElseGet(() ->
-                                    Standing.builder()
-                                            .team(team)
-                                            .build()
-                            );
+            Standing standing = standingRepository
+                    .findByTeamId(team.getId())
+                    .orElseGet(() ->
+                            Standing.builder()
+                                    .team(team)
+                                    .build()
+                    );
 
             standing.setPlayed(0);
             standing.setWins(0);
@@ -129,10 +118,7 @@ public class StandingService {
             standing.setDraws(0);
             standing.setPoints(0);
 
-            standings.put(
-                    team.getId(),
-                    standing
-            );
+            standings.put(team.getId(), standing);
         }
 
         for (Match match : completedMatches) {
@@ -140,11 +126,8 @@ public class StandingService {
             Team teamA = match.getTeamA();
             Team teamB = match.getTeamB();
 
-            Standing standingA =
-                    standings.get(teamA.getId());
-
-            Standing standingB =
-                    standings.get(teamB.getId());
+            Standing standingA = standings.get(teamA.getId());
+            Standing standingB = standings.get(teamB.getId());
 
             if (standingA == null || standingB == null) {
                 continue;
@@ -179,10 +162,8 @@ public class StandingService {
                         standingB.getPoints()
                                 + sport.getDrawPoints()
                 );
-            }
 
-
-            else if (winner.getId().equals(teamA.getId())) {
+            } else if (winner.getId().equals(teamA.getId())) {
 
                 standingA.setWins(
                         standingA.getWins() + 1
@@ -201,10 +182,8 @@ public class StandingService {
                         standingB.getPoints()
                                 + sport.getLossPoints()
                 );
-            }
 
-
-            else if (winner.getId().equals(teamB.getId())) {
+            } else if (winner.getId().equals(teamB.getId())) {
 
                 standingB.setWins(
                         standingB.getWins() + 1
@@ -226,8 +205,6 @@ public class StandingService {
             }
         }
 
-        standingRepository.saveAll(
-                standings.values()
-        );
+        standingRepository.saveAll(standings.values());
     }
 }

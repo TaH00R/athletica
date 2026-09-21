@@ -26,10 +26,10 @@ public class MatchService {
     private final SportRepository sportRepository;
     private final TeamRepository teamRepository;
     private final StandingService standingService;
+    private final MatchWebSocketService matchWebSocketService;
 
     @Transactional(readOnly = true)
     public List<MatchResponse> getAllMatches() {
-
         return matchRepository.findAll()
                 .stream()
                 .map(this::toResponse)
@@ -38,19 +38,13 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public MatchResponse getMatchById(Long id) {
-
-        Match match = findMatch(id);
-
-        return toResponse(match);
+        return toResponse(findMatch(id));
     }
 
     @Transactional(readOnly = true)
     public List<MatchResponse> getLiveMatches() {
-
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(
-                        MatchStatus.LIVE
-                )
+                .findByStatusOrderByScheduledAtAsc(MatchStatus.LIVE)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -58,24 +52,17 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public List<MatchResponse> getUpcomingMatches() {
-
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(
-                        MatchStatus.UPCOMING
-                )
+                .findByStatusOrderByScheduledAtAsc(MatchStatus.UPCOMING)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-
     @Transactional(readOnly = true)
     public List<MatchResponse> getCompletedMatches() {
-
         return matchRepository
-                .findByStatusOrderByScheduledAtAsc(
-                        MatchStatus.COMPLETED
-                )
+                .findByStatusOrderByScheduledAtAsc(MatchStatus.COMPLETED)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -116,9 +103,7 @@ public class MatchService {
                 .toList();
     }
 
-    public MatchResponse createMatch(
-            MatchCreateRequest request
-    ) {
+    public MatchResponse createMatch(MatchCreateRequest request) {
 
         Sport sport = sportRepository
                 .findById(request.sportId())
@@ -147,11 +132,7 @@ public class MatchService {
                         )
                 );
 
-        validateTeams(
-                sport,
-                teamA,
-                teamB
-        );
+        validateTeams(sport, teamA, teamB);
 
         Match match = Match.builder()
                 .sport(sport)
@@ -205,21 +186,23 @@ public class MatchService {
                         )
                 );
 
-        validateTeams(
-                sport,
-                teamA,
-                teamB
-        );
+        validateTeams(sport, teamA, teamB);
 
         if (match.getStatus() == MatchStatus.LIVE
                 || match.getStatus() == MatchStatus.COMPLETED) {
 
-            if (!match.getSport().getId().equals(sport.getId())
-                    || !match.getTeamA().getId().equals(teamA.getId())
-                    || !match.getTeamB().getId().equals(teamB.getId())) {
+            boolean sportChanged =
+                    !match.getSport().getId().equals(sport.getId());
 
+            boolean teamAChanged =
+                    !match.getTeamA().getId().equals(teamA.getId());
+
+            boolean teamBChanged =
+                    !match.getTeamB().getId().equals(teamB.getId());
+
+            if (sportChanged || teamAChanged || teamBChanged) {
                 throw new IllegalStateException(
-                        "Cannot change sport or teams of a live/completed match"
+                        "Cannot change sport or teams of a live or completed match"
                 );
             }
         }
@@ -241,20 +224,16 @@ public class MatchService {
 
         Match match = findMatch(id);
 
-        if (match.getStatus() == MatchStatus.COMPLETED) {
+        if (match.getStatus() != MatchStatus.LIVE) {
             throw new IllegalStateException(
-                    "Cannot update the score of a completed match"
-            );
-        }
-
-        if (match.getStatus() == MatchStatus.CANCELLED) {
-            throw new IllegalStateException(
-                    "Cannot update the score of a cancelled match"
+                    "Score can only be updated for a live match"
             );
         }
 
         match.setScoreA(request.scoreA());
         match.setScoreB(request.scoreB());
+
+        matchWebSocketService.broadcastMatchUpdate(match);
 
         return toResponse(match);
     }
@@ -269,16 +248,14 @@ public class MatchService {
         MatchStatus oldStatus = match.getStatus();
         MatchStatus newStatus = request.status();
 
-        validateStatusTransition(
-                oldStatus,
-                newStatus
-        );
+        validateStatusTransition(oldStatus, newStatus);
 
         if (newStatus == MatchStatus.COMPLETED) {
 
             if (request.winnerTeamId() != null) {
 
                 Long winnerId = request.winnerTeamId();
+
                 if (!winnerId.equals(match.getTeamA().getId())
                         && !winnerId.equals(match.getTeamB().getId())) {
 
@@ -300,9 +277,8 @@ public class MatchService {
             } else {
                 match.setWinner(null);
             }
-        }
 
-        else {
+        } else {
             match.setWinner(null);
         }
 
@@ -316,9 +292,10 @@ public class MatchService {
             );
         }
 
+        matchWebSocketService.broadcastMatchUpdate(match);
+
         return toResponse(match);
     }
-
 
     public void deleteMatch(Long id) {
 
@@ -334,6 +311,8 @@ public class MatchService {
         if (wasCompleted) {
             standingService.recalculateStandings(sportId);
         }
+
+        matchWebSocketService.broadcastMatchUpdate(match);
     }
 
     private Match findMatch(Long id) {
@@ -354,28 +333,23 @@ public class MatchService {
     ) {
 
         if (teamA.getId().equals(teamB.getId())) {
-
             throw new IllegalArgumentException(
                     "A team cannot play against itself"
             );
         }
 
-
         if (!teamA.getSport().getId().equals(sport.getId())) {
-
             throw new IllegalArgumentException(
                     "Team A does not belong to this sport"
             );
         }
 
         if (!teamB.getSport().getId().equals(sport.getId())) {
-
             throw new IllegalArgumentException(
                     "Team B does not belong to this sport"
             );
         }
     }
-
 
     private void validateStatusTransition(
             MatchStatus oldStatus,
@@ -386,7 +360,6 @@ public class MatchService {
             return;
         }
 
-
         if (oldStatus == MatchStatus.CANCELLED
                 && newStatus != MatchStatus.UPCOMING) {
 
@@ -396,38 +369,30 @@ public class MatchService {
         }
     }
 
-
     private MatchResponse toResponse(Match match) {
 
         Team winner = match.getWinner();
 
         return new MatchResponse(
-
                 match.getId(),
 
-                // Sport
                 match.getSport().getId(),
                 match.getSport().getName(),
 
-                // Team A
                 match.getTeamA().getId(),
                 match.getTeamA().getName(),
                 match.getScoreA(),
 
-                // Team B
                 match.getTeamB().getId(),
                 match.getTeamB().getName(),
                 match.getScoreB(),
 
-                // Match metadata
                 match.getVenue(),
                 match.getRoundName(),
                 match.getScheduledAt(),
 
-                // Status
                 match.getStatus(),
 
-                // Winner
                 winner != null
                         ? winner.getId()
                         : null,
