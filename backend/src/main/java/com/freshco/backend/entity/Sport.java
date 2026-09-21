@@ -31,4 +31,20 @@ public class Sport {
     @Column(nullable = false)
     @Builder.Default
     private Integer displayOrder = 0;
+
+    @Column(nullable = false, length = 50)
+    @Builder.Default
+    private String primaryStat = "POINTS";
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer winPoints = 3;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer drawPoints = 1;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer lossPoints = 0;
 }

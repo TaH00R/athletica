@@ -55,7 +55,31 @@ public class SportService {
                 .description(request.description())
                 .icon(request.icon())
                 .active(request.active() == null || request.active())
-                .displayOrder(request.displayOrder() != null ? request.displayOrder() : 0)
+                .displayOrder(
+                        request.displayOrder() != null
+                                ? request.displayOrder()
+                                : 0
+                )
+                .primaryStat(
+                        request.primaryStat() != null
+                                ? request.primaryStat().trim().toUpperCase()
+                                : "POINTS"
+                )
+                .winPoints(
+                        request.winPoints() != null
+                                ? request.winPoints()
+                                : 3
+                )
+                .drawPoints(
+                        request.drawPoints() != null
+                                ? request.drawPoints()
+                                : 1
+                )
+                .lossPoints(
+                        request.lossPoints() != null
+                                ? request.lossPoints()
+                                : 0
+                )
                 .build();
 
         return toResponse(sportRepository.save(sport));
@@ -87,6 +111,24 @@ public class SportService {
             sport.setDisplayOrder(request.displayOrder());
         }
 
+        if (request.primaryStat() != null) {
+            sport.setPrimaryStat(
+                    request.primaryStat().trim().toUpperCase()
+            );
+        }
+
+        if (request.winPoints() != null) {
+            sport.setWinPoints(request.winPoints());
+        }
+
+        if (request.drawPoints() != null) {
+            sport.setDrawPoints(request.drawPoints());
+        }
+
+        if (request.lossPoints() != null) {
+            sport.setLossPoints(request.lossPoints());
+        }
+
         return toResponse(sport);
     }
 
@@ -106,7 +148,11 @@ public class SportService {
                 sport.getDescription(),
                 sport.getIcon(),
                 sport.getActive(),
-                sport.getDisplayOrder()
+                sport.getDisplayOrder(),
+                sport.getPrimaryStat(),
+                sport.getWinPoints(),
+                sport.getDrawPoints(),
+                sport.getLossPoints()
         );
     }
 }

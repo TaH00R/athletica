@@ -6,6 +6,10 @@ public record SportResponse(
         String description,
         String icon,
         Boolean active,
-        Integer displayOrder
+        Integer displayOrder,
+        String primaryStat,
+        Integer winPoints,
+        Integer drawPoints,
+        Integer lossPoints
 ) {
 }

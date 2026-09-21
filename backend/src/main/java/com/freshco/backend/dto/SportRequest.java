@@ -1,7 +1,6 @@
 package com.freshco.backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 public record SportRequest(
 
@@ -16,6 +15,19 @@ public record SportRequest(
 
         Boolean active,
 
-        Integer displayOrder
+        @Min(value = 0, message = "Display order cannot be negative")
+        Integer displayOrder,
+
+        @Size(max = 50, message = "Primary stat cannot exceed 50 characters")
+        String primaryStat,
+
+        @Min(value = 0, message = "Win points cannot be negative")
+        Integer winPoints,
+
+        @Min(value = 0, message = "Draw points cannot be negative")
+        Integer drawPoints,
+
+        @Min(value = 0, message = "Loss points cannot be negative")
+        Integer lossPoints
 ) {
 }
