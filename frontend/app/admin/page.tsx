@@ -76,7 +76,7 @@ export default function AdminLogin() {
 
             <div>
               <div className="display-font text-2xl sm:text-3xl">
-                ATHLETICA
+                SPARK
               </div>
 
               <div className="mono-font mt-1 text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">

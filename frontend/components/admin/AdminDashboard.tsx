@@ -85,7 +85,7 @@ export default function AdminDashboard({
           <div className="border-b border-white/10 px-7 py-6">
             <Link href="/admin/dashboard">
               <div className="display-font text-2xl">
-                ATHLETICA
+                SPARK
               </div>
 
               <div className="mono-font mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
@@ -156,7 +156,7 @@ export default function AdminDashboard({
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
                 <div>
                   <div className="display-font text-2xl">
-                    ATHLETICA
+                    SPARK
                   </div>
 
                   <div className="mono-font mt-1 text-[9px] uppercase tracking-[0.18em] text-white/40">

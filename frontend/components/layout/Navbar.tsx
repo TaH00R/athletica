@@ -33,7 +33,7 @@ export default function Navbar() {
 
           <div className="flex flex-col leading-none">
             <span className="display-font text-[28px] tracking-tight text-[#f4f0e5]">
-              ATHLETICA
+              SPARK
             </span>
           </div>
         </Link>
