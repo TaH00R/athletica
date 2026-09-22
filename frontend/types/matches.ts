@@ -10,12 +10,12 @@ export type Match = {
   sportName: string;
   teamAId: number;
   teamAName: string;
-  scoreA: string;
+  scoreA: number;
   teamBId: number;
   teamBName: string;
-  scoreB: string;
-  venue: string;
-  roundName: string;
+  scoreB: number;
+  venue: string | null;
+  roundName: string | null;
   scheduledAt: string;
   status: MatchStatus;
   winnerId: number | null;

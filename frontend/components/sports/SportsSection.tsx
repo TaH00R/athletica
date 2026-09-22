@@ -1,14 +1,13 @@
 import Link from "next/link";
 import SportCard from "./SportCard";
-import { getSports } from "@/lib/api";
-import type { Sport } from "@/types/sports";
+import { api } from "@/lib/api";
 
 export default async function SportsSection() {
-  const sports: Sport[] = await getSports();
+  const sports = await api.sports.getActive();
 
-  const activeSports = sports
-    .filter((sport) => sport.active)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const activeSports = sports.sort(
+    (a, b) => a.displayOrder - b.displayOrder
+  );
 
   return (
     <section className="border-b border-white/10 bg-[#063b32]">

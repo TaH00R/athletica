@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { getLiveMatches } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Match } from "@/types/matches";
 
 export default async function LiveMatchCard() {
   let matches: Match[] = [];
 
   try {
-    matches = await getLiveMatches();
+    matches = await api.matches.getLive();
   } catch {
     matches = [];
   }

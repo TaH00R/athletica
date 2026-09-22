@@ -21,10 +21,8 @@ export default function Home() {
           />
 
           <div className="absolute inset-0 bg-[#063b32]/15" />
-
-          <div className="absolute inset-0 bg-gradient-to-r from-[#063b32]/85 via-[#063b32]/25 to-transparent" />
-
-          <div className="absolute inset-0 bg-gradient-to-t from-[#063b32]/70 via-transparent to-[#063b32]/10" />
+          <div className="absolute inset-0 bg-linear-to-r from-[#063b32]/85 via-[#063b32]/25 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#063b32]/70 via-transparent to-[#063b32]/10" />
         </div>
 
         <div className="relative z-10 mx-auto grid min-h-[calc(100vh-76px)] max-w-[1600px] grid-cols-1 items-start gap-10 px-5 pb-14 pt-16 sm:px-8 sm:pt-20 lg:grid-cols-[1fr_0.9fr] lg:gap-16 lg:px-10 lg:pt-25">
