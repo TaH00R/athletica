@@ -6,3 +6,10 @@ export type PlayerStat = {
   statType: string;
   value: number;
 };
+
+export type PlayerStatRequest = {
+  playerId: number;
+  matchId: number;
+  statType: string;
+  value: number;
+};

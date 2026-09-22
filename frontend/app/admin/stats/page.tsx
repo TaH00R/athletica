@@ -4,87 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  CalendarDays,
   Edit3,
   Plus,
   Search,
   Trash2,
   Trophy,
   Users,
-  CalendarDays,
   X,
 } from "lucide-react";
 
-type Sport = {
-  id: number;
-  name: string;
-  primaryStat: string | null;
-  active: boolean;
-  displayOrder: number;
-};
-
-type Team = {
-  id: number;
-  name: string;
-  sportId?: number;
-  sportName?: string;
-  sport?: {
-    id: number;
-    name: string;
-  } | null;
-};
-
-type Player = {
-  id: number;
-  name: string;
-  teamId?: number;
-  teamName?: string;
-  team?: {
-    id: number;
-    name: string;
-    sport?: {
-      id: number;
-      name: string;
-    } | null;
-  } | null;
-};
-
-type Match = {
-  id: number;
-  sportId: number;
-  sportName: string;
-  teamAId: number;
-  teamAName: string;
-  scoreA: number;
-  teamBId: number;
-  teamBName: string;
-  scoreB: number;
-  venue: string | null;
-  roundName: string | null;
-  scheduledAt: string;
-  status: "UPCOMING" | "LIVE" | "COMPLETED" | "CANCELLED";
-  winnerId: number | null;
-  winnerName: string | null;
-};
-
-type PlayerStat = {
-  id: number;
-  playerId?: number;
-  playerName?: string;
-  matchId?: number;
-  statType: string;
-  value: number;
-  player?: {
-    id: number;
-    name: string;
-    team?: {
-      id: number;
-      name: string;
-    } | null;
-  } | null;
-  match?: {
-    id: number;
-  } | null;
-};
+import { api } from "@/lib/api";
+import type {
+  Match,
+  Player,
+  PlayerStat,
+  PlayerStatRequest,
+  Sport,
+} from "@/types";
 
 type StatForm = {
   playerId: string;
@@ -103,155 +40,181 @@ const emptyForm: StatForm = {
 export default function AdminStatsPage() {
   const router = useRouter();
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:6967";
-
   const [stats, setStats] = useState<PlayerStat[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
 
   const [search, setSearch] = useState("");
-  const [sportFilter, setSportFilter] = useState("ALL");
-  const [matchFilter, setMatchFilter] = useState("ALL");
+  const [sportFilter, setSportFilter] =
+    useState("ALL");
+  const [matchFilter, setMatchFilter] =
+    useState("ALL");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [showModal, setShowModal] = useState(false);
-  const [editingStat, setEditingStat] = useState<PlayerStat | null>(null);
-  const [form, setForm] = useState<StatForm>(emptyForm);
+  const [showModal, setShowModal] =
+    useState(false);
+  const [editingStat, setEditingStat] =
+    useState<PlayerStat | null>(null);
+  const [form, setForm] =
+    useState<StatForm>(emptyForm);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const getPlayerId = (stat: PlayerStat) => {
-    return stat.playerId ?? stat.player?.id ?? null;
-  };
+  const selectedMatch = useMemo(() => {
+    return matches.find(
+      (match) =>
+        String(match.id) === form.matchId
+    );
+  }, [matches, form.matchId]);
 
-  const getPlayerName = (stat: PlayerStat) => {
+  const playersForSelectedMatch =
+    useMemo(() => {
+      if (!selectedMatch) {
+        return players;
+      }
+
+      const teamIds = new Set([
+        selectedMatch.teamAId,
+        selectedMatch.teamBId,
+      ]);
+
+      return players.filter((player) => {
+        const teamId = player.teamId;
+
+        return (
+          teamId !== undefined &&
+          teamIds.has(teamId)
+        );
+      });
+    }, [players, selectedMatch]);
+
+  const getPlayerName = (
+    stat: PlayerStat
+  ) => {
     return (
-      stat.playerName ??
-      stat.player?.name ??
-      players.find((player) => player.id === getPlayerId(stat))?.name ??
+      stat.playerName ||
+      players.find(
+        (player) =>
+          player.id === stat.playerId
+      )?.name ||
       "Unknown Player"
     );
   };
 
-  const getMatchId = (stat: PlayerStat) => {
-    return stat.matchId ?? stat.match?.id ?? null;
+  const getPlayerTeamName = (
+    stat: PlayerStat
+  ) => {
+    return (
+      players.find(
+        (player) =>
+          player.id === stat.playerId
+      )?.teamName ||
+      "Unknown Team"
+    );
   };
 
   const getMatch = (stat: PlayerStat) => {
-    return matches.find((match) => match.id === getMatchId(stat));
-  };
-
-  const getPlayerTeamName = (stat: PlayerStat) => {
-    if (stat.player?.team?.name) {
-      return stat.player.team.name;
-    }
-
-    const player = players.find(
-      (item) => item.id === getPlayerId(stat)
-    );
-
-    if (player?.teamName) {
-      return player.teamName;
-    }
-
-    if (player?.team?.name) {
-      return player.team.name;
-    }
-
-    return "Unknown Team";
-  };
-
-  const getStatSportId = (stat: PlayerStat) => {
-    const match = getMatch(stat);
-    return match?.sportId ?? null;
-  };
-
-  const getStatSportName = (stat: PlayerStat) => {
-    return getMatch(stat)?.sportName ?? "Unknown Sport";
-  };
-
-  const selectedMatch = useMemo(() => {
     return matches.find(
-      (match) => String(match.id) === form.matchId
+      (match) => match.id === stat.matchId
     );
-  }, [matches, form.matchId]);
+  };
 
-  const playersForSelectedMatch = useMemo(() => {
-    if (!selectedMatch) {
-      return players;
-    }
+  const getSport = (stat: PlayerStat) => {
+    const match = getMatch(stat);
 
-    const teamIds = new Set([
-      selectedMatch.teamAId,
-      selectedMatch.teamBId,
-    ]);
-
-    return players.filter((player) => {
-      const teamId = player.teamId ?? player.team?.id;
-
-      return teamId ? teamIds.has(teamId) : false;
-    });
-  }, [players, selectedMatch]);
+    return sports.find(
+      (sport) => sport.id === match?.sportId
+    );
+  };
 
   const filteredStats = useMemo(() => {
-    const value = search.toLowerCase().trim();
+    const value = search
+      .toLowerCase()
+      .trim();
 
     return stats.filter((stat) => {
-      const playerName = getPlayerName(stat).toLowerCase();
-      const teamName = getPlayerTeamName(stat).toLowerCase();
-      const sportName = getStatSportName(stat).toLowerCase();
+      const playerName =
+        getPlayerName(stat).toLowerCase();
+
+      const teamName =
+        getPlayerTeamName(stat).toLowerCase();
+
       const match = getMatch(stat);
+
+      const sport = getSport(stat);
+
+      const sportName =
+        sport?.name?.toLowerCase() || "";
+
+      const matchName = match
+        ? `${match.teamAName} ${match.teamBName}`
+            .toLowerCase()
+        : "";
 
       const matchesSearch =
         !value ||
         playerName.includes(value) ||
         teamName.includes(value) ||
         sportName.includes(value) ||
-        stat.statType.toLowerCase().includes(value) ||
+        matchName.includes(value) ||
+        stat.statType
+          .toLowerCase()
+          .includes(value) ||
         String(stat.id).includes(value);
 
       const matchesSport =
         sportFilter === "ALL" ||
-        String(getStatSportId(stat)) === sportFilter;
+        String(match?.sportId) ===
+          sportFilter;
 
       const matchesMatch =
         matchFilter === "ALL" ||
-        String(match?.id) === matchFilter;
+        String(match?.id) ===
+          matchFilter;
 
-      return matchesSearch && matchesSport && matchesMatch;
+      return (
+        matchesSearch &&
+        matchesSport &&
+        matchesMatch
+      );
     });
-  }, [stats, players, matches, search, sportFilter, matchFilter]);
+  }, [
+    stats,
+    players,
+    matches,
+    sports,
+    search,
+    sportFilter,
+    matchFilter,
+  ]);
 
   const uniquePlayers = useMemo(() => {
     return new Set(
-      stats
-        .map((stat) => getPlayerId(stat))
-        .filter((id): id is number => id !== null)
+      stats.map((stat) => stat.playerId)
     ).size;
   }, [stats]);
 
   const uniqueMatches = useMemo(() => {
     return new Set(
-      stats
-        .map((stat) => getMatchId(stat))
-        .filter((id): id is number => id !== null)
+      stats.map((stat) => stat.matchId)
     ).size;
   }, [stats]);
 
   const totalValue = useMemo(() => {
     return stats.reduce(
-      (total, stat) => total + Number(stat.value || 0),
+      (total, stat) =>
+        total + Number(stat.value || 0),
       0
     );
   }, [stats]);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin_token");
+    const token =
+      localStorage.getItem("admin_token");
 
     if (!token) {
       router.push("/admin");
@@ -261,70 +224,10 @@ export default function AdminStatsPage() {
     loadData();
   }, [router]);
 
-  const loadData = async () => {
+  async function loadData() {
     try {
       setLoading(true);
       setError("");
-
-      const [
-        statsResponse,
-        playersResponse,
-        matchesResponse,
-        sportsResponse,
-      ] = await Promise.all([
-        fetch(`${API_URL}/api/player-stats`, {
-          cache: "no-store",
-        }),
-        fetch(`${API_URL}/api/players`, {
-          cache: "no-store",
-        }),
-        fetch(`${API_URL}/api/matches`, {
-          cache: "no-store",
-        }),
-        fetch(`${API_URL}/api/sports`, {
-          cache: "no-store",
-        }),
-      ]);
-
-      if (!statsResponse.ok) {
-        const message = await statsResponse.text();
-
-        throw new Error(
-          `Failed to load stats (${statsResponse.status}): ${
-            message || "No response body"
-          }`
-        );
-      }
-
-      if (!playersResponse.ok) {
-        const message = await playersResponse.text();
-
-        throw new Error(
-          `Failed to load players (${playersResponse.status}): ${
-            message || "No response body"
-          }`
-        );
-      }
-
-      if (!matchesResponse.ok) {
-        const message = await matchesResponse.text();
-
-        throw new Error(
-          `Failed to load matches (${matchesResponse.status}): ${
-            message || "No response body"
-          }`
-        );
-      }
-
-      if (!sportsResponse.ok) {
-        const message = await sportsResponse.text();
-
-        throw new Error(
-          `Failed to load sports (${sportsResponse.status}): ${
-            message || "No response body"
-          }`
-        );
-      }
 
       const [
         statsData,
@@ -332,10 +235,10 @@ export default function AdminStatsPage() {
         matchesData,
         sportsData,
       ] = await Promise.all([
-        statsResponse.json(),
-        playersResponse.json(),
-        matchesResponse.json(),
-        sportsResponse.json(),
+        api.stats.getAll(),
+        api.players.getAll(),
+        api.matches.getAll(),
+        api.sports.getAll(),
       ]);
 
       setStats(statsData);
@@ -343,50 +246,58 @@ export default function AdminStatsPage() {
 
       setMatches(
         [...matchesData].sort(
-          (a: Match, b: Match) =>
-            new Date(b.scheduledAt).getTime() -
-            new Date(a.scheduledAt).getTime()
+          (a, b) =>
+            new Date(
+              b.scheduledAt
+            ).getTime() -
+            new Date(
+              a.scheduledAt
+            ).getTime()
         )
       );
 
       setSports(
         [...sportsData].sort(
-          (a: Sport, b: Sport) =>
-            a.displayOrder - b.displayOrder
+          (a, b) =>
+            a.displayOrder -
+            b.displayOrder
         )
       );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load stats"
+        err instanceof Error
+          ? err.message
+          : "Failed to load stats"
       );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const openAddModal = () => {
+  function openAddModal() {
     setEditingStat(null);
 
     setForm({
       ...emptyForm,
-      matchId: matches[0]?.id ? String(matches[0].id) : "",
+      matchId:
+        matches[0]?.id
+          ? String(matches[0].id)
+          : "",
     });
 
     setError("");
     setSuccess("");
     setShowModal(true);
-  };
+  }
 
-  const openEditModal = (stat: PlayerStat) => {
+  function openEditModal(
+    stat: PlayerStat
+  ) {
     setEditingStat(stat);
 
     setForm({
-      playerId: getPlayerId(stat)
-        ? String(getPlayerId(stat))
-        : "",
-      matchId: getMatchId(stat)
-        ? String(getMatchId(stat))
-        : "",
+      playerId: String(stat.playerId),
+      matchId: String(stat.matchId),
       statType: stat.statType,
       value: Number(stat.value),
     });
@@ -394,25 +305,27 @@ export default function AdminStatsPage() {
     setError("");
     setSuccess("");
     setShowModal(true);
-  };
+  }
 
-  const closeModal = () => {
-    if (saving) return;
+  function closeModal() {
+    if (saving) {
+      return;
+    }
 
     setShowModal(false);
     setEditingStat(null);
     setForm(emptyForm);
     setError("");
-  };
+  }
 
-  const saveStat = async () => {
-    if (!form.playerId) {
-      setError("Please select a player.");
+  async function saveStat() {
+    if (!form.matchId) {
+      setError("Please select a match.");
       return;
     }
 
-    if (!form.matchId) {
-      setError("Please select a match.");
+    if (!form.playerId) {
+      setError("Please select a player.");
       return;
     }
 
@@ -422,7 +335,9 @@ export default function AdminStatsPage() {
     }
 
     if (Number(form.value) < 0) {
-      setError("Stat value cannot be negative.");
+      setError(
+        "Stat value cannot be negative."
+      );
       return;
     }
 
@@ -430,57 +345,38 @@ export default function AdminStatsPage() {
       setSaving(true);
       setError("");
 
-      const token = localStorage.getItem("admin_token");
-
-      if (!token) {
-        router.push("/admin");
-        return;
-      }
-
-      const payload = {
+      const payload: PlayerStatRequest = {
         playerId: Number(form.playerId),
         matchId: Number(form.matchId),
         statType: form.statType.trim(),
         value: Number(form.value),
       };
 
-      const response = await fetch(`${API_URL}/api/player-stats`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const message = await response.text();
-
-        throw new Error(
-          message || "Failed to save player stat"
-        );
-      }
-
-      const savedStat = await response.json();
+      const savedStat =
+        await api.stats.create(payload);
 
       setStats((current) => {
-        const existingIndex = current.findIndex(
-          (stat) =>
-            stat.id === savedStat.id ||
-            (
-              getPlayerId(stat) === Number(form.playerId) &&
-              getMatchId(stat) === Number(form.matchId) &&
-              stat.statType.toLowerCase() ===
-                form.statType.trim().toLowerCase()
-            )
-        );
+        const existingIndex =
+          current.findIndex(
+            (stat) =>
+              stat.id === savedStat.id ||
+              (stat.playerId ===
+                payload.playerId &&
+                stat.matchId ===
+                  payload.matchId &&
+                stat.statType.toLowerCase() ===
+                  payload.statType.toLowerCase())
+          );
 
         if (existingIndex === -1) {
           return [...current, savedStat];
         }
 
-        return current.map((stat, index) =>
-          index === existingIndex ? savedStat : stat
+        return current.map(
+          (stat, index) =>
+            index === existingIndex
+              ? savedStat
+              : stat
         );
       });
 
@@ -495,88 +391,87 @@ export default function AdminStatsPage() {
       setForm(emptyForm);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to save stat"
+        err instanceof Error
+          ? err.message
+          : "Failed to save stat"
       );
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const deleteStat = async (stat: PlayerStat) => {
-    const confirmed = window.confirm(
-      `Delete ${getPlayerName(stat)}'s ${stat.statType} stat?`
-    );
+  async function deleteStat(
+    stat: PlayerStat
+  ) {
+    const confirmed =
+      window.confirm(
+        `Delete ${getPlayerName(stat)}'s ${stat.statType} stat?`
+      );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setError("");
       setSuccess("");
 
-      const token = localStorage.getItem("admin_token");
-
-      if (!token) {
-        router.push("/admin");
-        return;
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/player-stats/${stat.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const message = await response.text();
-
-        throw new Error(
-          message || "Failed to delete player stat"
-        );
-      }
+      await api.stats.delete(stat.id);
 
       setStats((current) =>
-        current.filter((item) => item.id !== stat.id)
+        current.filter(
+          (item) => item.id !== stat.id
+        )
       );
 
-      setSuccess("Player stat deleted successfully.");
+      setSuccess(
+        "Player stat deleted successfully."
+      );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete stat"
+        err instanceof Error
+          ? err.message
+          : "Failed to delete stat"
       );
     }
-  };
+  }
 
-  const formatDate = (value: string) => {
-    return new Intl.DateTimeFormat("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(value));
-  };
+  function formatDate(value: string) {
+    return new Intl.DateTimeFormat(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    ).format(new Date(value));
+  }
 
   return (
-    <main className="min-h-screen bg-[#f3ead8] text-[#063b32]">
+    <main className="min-h-screen overflow-x-hidden bg-[#f3ead8] text-[#063b32]">
       <header className="sticky top-0 z-40 border-b-2 border-[#063b32] bg-[#f3ead8]">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-5 lg:px-10">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <button
-              onClick={() => router.push("/admin/dashboard")}
-              className="flex h-14 w-14 items-center justify-center border-2 border-[#063b32] bg-[#fbf5e8] shadow-[5px_5px_0_#063b32] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_#063b32]"
+              onClick={() =>
+                router.push(
+                  "/admin/dashboard"
+                )
+              }
+              className="flex h-12 w-12 shrink-0 items-center justify-center border-2 border-[#063b32] bg-[#fbf5e8] shadow-[4px_4px_0_#063b32] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#063b32] sm:h-14 sm:w-14 sm:shadow-[5px_5px_0_#063b32]"
             >
-              <ArrowLeft size={25} />
+              <ArrowLeft size={22} />
             </button>
 
-            <div>
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em] opacity-60">
-                <Trophy size={17} />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-60 min-[420px]:text-xs sm:text-sm sm:tracking-[0.2em]">
+                <Trophy size={15} />
                 Freshers&apos; Cup
               </div>
 
-              <h1 className="mt-1 text-4xl font-black uppercase tracking-tight lg:text-5xl">
+              <h1 className="mt-1 truncate text-3xl font-black uppercase tracking-tight min-[420px]:text-4xl lg:text-5xl">
                 Player Stats
               </h1>
             </div>
@@ -584,92 +479,101 @@ export default function AdminStatsPage() {
 
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 border-2 border-[#063b32] bg-[#e85a4f] px-6 py-4 text-base font-black uppercase tracking-wide text-[#fff7e8] shadow-[5px_5px_0_#063b32] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_#063b32]"
+            className="flex w-full items-center justify-center gap-2 border-2 border-[#063b32] bg-[#e85a4f] px-5 py-4 text-base font-black uppercase tracking-wide text-[#fff7e8] shadow-[5px_5px_0_#063b32] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_#063b32] sm:px-6 lg:w-auto"
           >
-            <Plus size={21} />
+            <Plus size={20} />
             Add Stat
           </button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1500px] px-6 py-8 lg:px-10">
-        <div className="grid gap-5 md:grid-cols-4">
-          <div className="border-2 border-[#063b32] bg-[#104c41] p-7 text-[#fff7e8] shadow-[7px_7px_0_#063b32]">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] opacity-70">
+      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+        <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
+          <div className="border-2 border-[#063b32] bg-[#104c41] p-5 text-[#fff7e8] shadow-[6px_6px_0_#063b32] sm:p-7 sm:shadow-[7px_7px_0_#063b32] min-[420px]:col-span-2 lg:col-span-1">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] opacity-70 sm:text-sm sm:tracking-[0.18em]">
               Total Stats
             </p>
 
-            <p className="mt-3 text-6xl font-black">
+            <p className="mt-3 text-5xl font-black sm:text-6xl">
               {stats.length}
             </p>
           </div>
 
-          <div className="border-2 border-[#063b32] bg-[#fbf5e8] p-7 shadow-[7px_7px_0_#063b32]">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] opacity-60">
+          <div className="border-2 border-[#063b32] bg-[#fbf5e8] p-5 shadow-[6px_6px_0_#063b32] sm:p-7 sm:shadow-[7px_7px_0_#063b32]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] opacity-60 sm:text-sm">
               Players Tracked
             </p>
 
-            <p className="mt-3 text-6xl font-black">
+            <p className="mt-3 text-5xl font-black sm:text-6xl">
               {uniquePlayers}
             </p>
           </div>
 
-          <div className="border-2 border-[#063b32] bg-[#fbf5e8] p-7 shadow-[7px_7px_0_#063b32]">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] opacity-60">
+          <div className="border-2 border-[#063b32] bg-[#fbf5e8] p-5 shadow-[6px_6px_0_#063b32] sm:p-7 sm:shadow-[7px_7px_0_#063b32]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] opacity-60 sm:text-sm">
               Matches Tracked
             </p>
 
-            <p className="mt-3 text-6xl font-black">
+            <p className="mt-3 text-5xl font-black sm:text-6xl">
               {uniqueMatches}
             </p>
           </div>
 
-          <div className="border-2 border-[#063b32] bg-[#d7c85f] p-7 shadow-[7px_7px_0_#063b32]">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] opacity-65">
+          <div className="border-2 border-[#063b32] bg-[#d7c85f] p-5 shadow-[6px_6px_0_#063b32] sm:p-7 sm:shadow-[7px_7px_0_#063b32]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] opacity-65 sm:text-sm">
               Stat Value
             </p>
 
-            <p className="mt-3 text-6xl font-black">
+            <p className="mt-3 text-5xl font-black sm:text-6xl">
               {totalValue}
             </p>
           </div>
         </div>
 
-        <div className="mt-9 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="mt-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] opacity-55">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-55 sm:text-sm sm:tracking-[0.2em]">
               Competition Data
             </p>
 
-            <h2 className="mt-1 text-3xl font-black uppercase">
+            <h2 className="mt-1 text-2xl font-black uppercase sm:text-3xl">
               Manage Player Stats
             </h2>
           </div>
 
           <div className="flex w-full flex-col gap-3 md:flex-row xl:w-auto">
-            <div className="relative md:w-[320px]">
+            <div className="relative min-w-0 flex-1 xl:w-[320px]">
               <Search
-                size={22}
+                size={21}
                 className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50"
               />
 
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
                 placeholder="SEARCH STATS..."
-                className="w-full border-2 border-[#063b32] bg-[#fbf5e8] py-4 pl-12 pr-4 text-base font-bold uppercase tracking-wide outline-none shadow-[5px_5px_0_#063b32]"
+                className="w-full border-2 border-[#063b32] bg-[#fbf5e8] py-4 pl-12 pr-4 text-base font-bold uppercase tracking-wide outline-none shadow-[5px_5px_0_#063b32] placeholder:opacity-40"
               />
             </div>
 
             <select
               value={sportFilter}
-              onChange={(e) => setSportFilter(e.target.value)}
-              className="border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none shadow-[5px_5px_0_#063b32]"
+              onChange={(e) =>
+                setSportFilter(e.target.value)
+              }
+              className="w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none shadow-[5px_5px_0_#063b32] md:w-auto"
             >
-              <option value="ALL">ALL SPORTS</option>
+              <option value="ALL">
+                ALL SPORTS
+              </option>
 
               {sports.map((sport) => (
-                <option key={sport.id} value={sport.id}>
+                <option
+                  key={sport.id}
+                  value={sport.id}
+                >
                   {sport.name}
                 </option>
               ))}
@@ -677,14 +581,22 @@ export default function AdminStatsPage() {
 
             <select
               value={matchFilter}
-              onChange={(e) => setMatchFilter(e.target.value)}
-              className="border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none shadow-[5px_5px_0_#063b32]"
+              onChange={(e) =>
+                setMatchFilter(e.target.value)
+              }
+              className="w-full max-w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none shadow-[5px_5px_0_#063b32] md:w-auto md:max-w-[280px]"
             >
-              <option value="ALL">ALL MATCHES</option>
+              <option value="ALL">
+                ALL MATCHES
+              </option>
 
               {matches.map((match) => (
-                <option key={match.id} value={match.id}>
-                  #{match.id} — {match.teamAName} vs{" "}
+                <option
+                  key={match.id}
+                  value={match.id}
+                >
+                  #{match.id} —{" "}
+                  {match.teamAName} vs{" "}
                   {match.teamBName}
                 </option>
               ))}
@@ -692,27 +604,37 @@ export default function AdminStatsPage() {
           </div>
         </div>
 
-        {error && (
-          <div className="mt-7 flex items-center justify-between gap-4 border-2 border-[#063b32] bg-[#e85a4f] px-6 py-5 text-base font-bold text-[#fff7e8] shadow-[5px_5px_0_#063b32]">
-            <span>{error}</span>
+        {error && !showModal && (
+          <div className="mt-6 flex items-start justify-between gap-4 border-2 border-[#063b32] bg-[#e85a4f] px-4 py-4 text-sm font-bold text-[#fff7e8] shadow-[5px_5px_0_#063b32] sm:px-6 sm:py-5 sm:text-base">
+            <span className="break-words">
+              {error}
+            </span>
 
-            <button onClick={() => setError("")}>
+            <button
+              onClick={() => setError("")}
+              className="shrink-0"
+            >
               <X size={20} />
             </button>
           </div>
         )}
 
         {success && (
-          <div className="mt-7 flex items-center justify-between gap-4 border-2 border-[#063b32] bg-[#d7c85f] px-6 py-5 text-base font-black shadow-[5px_5px_0_#063b32]">
-            <span>{success}</span>
+          <div className="mt-6 flex items-start justify-between gap-4 border-2 border-[#063b32] bg-[#d7c85f] px-4 py-4 text-sm font-black shadow-[5px_5px_0_#063b32] sm:px-6 sm:py-5 sm:text-base">
+            <span className="break-words">
+              {success}
+            </span>
 
-            <button onClick={() => setSuccess("")}>
+            <button
+              onClick={() => setSuccess("")}
+              className="shrink-0"
+            >
               <X size={20} />
             </button>
           </div>
         )}
 
-        <section className="mt-8 overflow-hidden border-2 border-[#063b32] bg-[#fbf5e8] shadow-[7px_7px_0_#063b32]">
+        <section className="mt-7 overflow-hidden border-2 border-[#063b32] bg-[#fbf5e8] shadow-[7px_7px_0_#063b32]">
           <div className="hidden grid-cols-[80px_1.5fr_1.3fr_1fr_120px_130px] border-b-2 border-[#063b32] bg-[#104c41] px-6 py-5 text-sm font-black uppercase tracking-[0.14em] text-[#fff7e8] lg:grid">
             <div>ID</div>
             <div>Player</div>
@@ -723,224 +645,325 @@ export default function AdminStatsPage() {
           </div>
 
           {loading ? (
-            <div className="px-6 py-20 text-center">
-              <p className="text-base font-bold uppercase tracking-[0.15em] opacity-50">
+            <div className="px-5 py-16 text-center sm:px-6 sm:py-20">
+              <p className="text-sm font-bold uppercase tracking-[0.15em] opacity-50 sm:text-base">
                 Loading player stats...
               </p>
             </div>
           ) : filteredStats.length === 0 ? (
-            <div className="px-6 py-20 text-center">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center border-2 border-[#063b32] bg-[#104c41] text-[#fff7e8]">
-                <Trophy size={34} />
+            <div className="px-5 py-16 text-center sm:px-6 sm:py-20">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center border-2 border-[#063b32] bg-[#104c41] text-[#fff7e8] sm:h-20 sm:w-20">
+                <Trophy size={30} />
               </div>
 
-              <h3 className="mt-6 text-2xl font-black uppercase">
+              <h3 className="mt-5 text-xl font-black uppercase sm:text-2xl">
                 No Stats Found
               </h3>
 
-              <p className="mt-2 text-base font-semibold opacity-60">
+              <p className="mt-2 text-sm font-semibold opacity-60 sm:text-base">
                 Add player statistics after a match.
               </p>
             </div>
           ) : (
             <div>
-              {filteredStats.map((stat, index) => {
-                const match = getMatch(stat);
+              {filteredStats.map(
+                (stat, index) => {
+                  const match =
+                    getMatch(stat);
 
-                return (
-                  <div
-                    key={stat.id}
-                    className={`grid items-center border-b-2 border-[#063b32] px-6 py-6 last:border-b-0 lg:grid-cols-[80px_1.5fr_1.3fr_1fr_120px_130px] ${
-                      index % 2 === 0
-                        ? "bg-[#fbf5e8]"
-                        : "bg-[#f0e5cf]"
-                    }`}
-                  >
-                    <div className="text-lg font-black opacity-50">
-                      #{stat.id}
-                    </div>
+                  const sport =
+                    getSport(stat);
 
-                    <div className="mt-4 lg:mt-0">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center border-2 border-[#063b32] bg-[#104c41] text-[#fff7e8]">
-                          <Users size={29} />
+                  return (
+                    <div
+                      key={stat.id}
+                      className={`border-b-2 border-[#063b32] last:border-b-0 ${
+                        index % 2 === 0
+                          ? "bg-[#fbf5e8]"
+                          : "bg-[#f0e5cf]"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-5 p-5 sm:p-6 lg:grid lg:grid-cols-[80px_1.5fr_1.3fr_1fr_120px_130px] lg:items-center lg:gap-0">
+                        <div className="flex items-center justify-between lg:block">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Stat ID
+                          </p>
+
+                          <p className="text-base font-black opacity-55 lg:text-lg">
+                            #{stat.id}
+                          </p>
                         </div>
 
                         <div>
-                          <p className="text-xl font-black uppercase">
-                            {getPlayerName(stat)}
+                          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Player
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold opacity-50">
-                            {getPlayerTeamName(stat)}
-                          </p>
+                          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center border-2 border-[#063b32] bg-[#104c41] text-[#fff7e8] sm:h-16 sm:w-16">
+                              <Users size={25} />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="break-words text-xl font-black uppercase sm:text-2xl">
+                                {getPlayerName(
+                                  stat
+                                )}
+                              </p>
+
+                              <p className="mt-1 break-words text-xs font-semibold opacity-50 sm:text-sm">
+                                {getPlayerTeamName(
+                                  stat
+                                )}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="mt-5 lg:mt-0">
-                      <p className="text-sm font-bold uppercase opacity-45 lg:hidden">
-                        Match
-                      </p>
-
-                      {match ? (
                         <div>
-                          <p className="text-base font-black uppercase">
-                            {match.teamAName} vs {match.teamBName}
+                          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Match
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold opacity-50">
-                            {match.sportName}
+                          {match ? (
+                            <div>
+                              <p className="break-words text-base font-black uppercase sm:text-lg">
+                                {match.teamAName}{" "}
+                                vs{" "}
+                                {match.teamBName}
+                              </p>
+
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold opacity-50 sm:text-sm">
+                                <span>
+                                  {sport?.name ||
+                                    match.sportName}
+                                </span>
+
+                                <span className="hidden sm:inline">
+                                  ·
+                                </span>
+
+                                <span>
+                                  Match #{match.id}
+                                </span>
+                              </div>
+
+                              <p className="mt-2 flex items-center gap-2 text-xs font-semibold opacity-50 sm:text-sm lg:hidden">
+                                <CalendarDays
+                                  size={14}
+                                />
+                                {formatDate(
+                                  match.scheduledAt
+                                )}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-base font-bold opacity-50">
+                              Match #
+                              {stat.matchId}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Stat Type
+                          </p>
+
+                          <span className="inline-block max-w-full break-words border-2 border-[#063b32] bg-[#d9cebb] px-3 py-2 text-sm font-black uppercase">
+                            {stat.statType}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between lg:block">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Value
+                          </p>
+
+                          <p className="text-4xl font-black sm:text-5xl">
+                            {stat.value}
                           </p>
                         </div>
-                      ) : (
-                        <p className="text-base font-bold opacity-50">
-                          Match #{getMatchId(stat)}
-                        </p>
-                      )}
-                    </div>
 
-                    <div className="mt-5 lg:mt-0">
-                      <p className="text-sm font-bold uppercase opacity-45 lg:hidden">
-                        Stat Type
-                      </p>
+                        <div>
+                          <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] opacity-45 lg:hidden">
+                            Actions
+                          </p>
 
-                      <span className="inline-block border-2 border-[#063b32] bg-[#d9cebb] px-3 py-2 text-sm font-black uppercase">
-                        {stat.statType}
-                      </span>
-                    </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() =>
+                                openEditModal(
+                                  stat
+                                )
+                              }
+                              className="flex h-12 flex-1 items-center justify-center gap-2 border-2 border-[#063b32] bg-[#fff7e8] px-4 text-sm font-black uppercase sm:flex-none sm:w-12 sm:px-0"
+                            >
+                              <Edit3 size={18} />
 
-                    <div className="mt-5 lg:mt-0">
-                      <p className="text-sm font-bold uppercase opacity-45 lg:hidden">
-                        Value
-                      </p>
+                              <span className="sm:hidden">
+                                Edit
+                              </span>
+                            </button>
 
-                      <p className="text-4xl font-black">
-                        {stat.value}
-                      </p>
-                    </div>
+                            <button
+                              onClick={() =>
+                                deleteStat(
+                                  stat
+                                )
+                              }
+                              className="flex h-12 flex-1 items-center justify-center gap-2 border-2 border-[#063b32] bg-[#e85a4f] px-4 text-sm font-black uppercase text-[#fff7e8] sm:flex-none sm:w-12 sm:px-0"
+                            >
+                              <Trash2 size={18} />
 
-                    <div className="mt-5 flex gap-3 lg:mt-0">
-                      <button
-                        onClick={() => openEditModal(stat)}
-                        className="flex h-11 w-11 items-center justify-center border-2 border-[#063b32] bg-[#fff7e8]"
-                        title="Edit"
-                      >
-                        <Edit3 size={19} />
-                      </button>
-
-                      <button
-                        onClick={() => deleteStat(stat)}
-                        className="flex h-11 w-11 items-center justify-center border-2 border-[#063b32] bg-[#e85a4f] text-[#fff7e8]"
-                        title="Delete"
-                      >
-                        <Trash2 size={19} />
-                      </button>
-                    </div>
-
-                    {match && (
-                      <div className="mt-4 flex items-center gap-2 text-sm font-semibold opacity-50 lg:hidden">
-                        <CalendarDays size={15} />
-                        {formatDate(match.scheduledAt)}
+                              <span className="sm:hidden">
+                                Delete
+                              </span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#063b32]/75 p-4">
-          <div className="admin-modal-scroll max-h-[92vh] w-full max-w-2xl overflow-y-auto border-2 border-[#063b32] bg-[#f3ead8] shadow-[10px_10px_0_#063b32]">
-            <div className="sticky top-0 flex items-center justify-between border-b-2 border-[#063b32] bg-[#104c41] px-6 py-6 text-[#fff7e8]">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] opacity-70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#063b32]/75 p-3 sm:p-4">
+          <div className="admin-modal-scroll max-h-[94vh] w-full max-w-2xl overflow-y-auto border-2 border-[#063b32] bg-[#f3ead8] shadow-[7px_7px_0_#063b32] sm:shadow-[10px_10px_0_#063b32]">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b-2 border-[#063b32] bg-[#104c41] px-4 py-5 text-[#fff7e8] sm:px-6 sm:py-6">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-70 sm:text-sm sm:tracking-[0.2em]">
                   Freshers&apos; Cup
                 </p>
 
-                <h2 className="mt-1 text-3xl font-black uppercase">
-                  {editingStat ? "Edit Stat" : "Add Stat"}
+                <h2 className="mt-1 text-2xl font-black uppercase sm:text-3xl">
+                  {editingStat
+                    ? "Edit Stat"
+                    : "Add Stat"}
                 </h2>
               </div>
 
               <button
                 onClick={closeModal}
-                className="flex h-11 w-11 items-center justify-center border-2 border-[#fff7e8]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-[#fff7e8] sm:h-11 sm:w-11"
               >
-                <X size={21} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="grid gap-6 p-6">
+            <div className="grid gap-5 p-4 sm:gap-6 sm:p-6">
               <div>
-                <label className="text-sm font-black uppercase tracking-[0.14em]">
+                <label className="text-xs font-black uppercase tracking-[0.14em] sm:text-sm">
                   Match
                 </label>
 
                 <select
                   value={form.matchId}
                   onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      matchId: e.target.value,
-                      playerId: "",
-                    }))
+                    setForm(
+                      (current) => ({
+                        ...current,
+                        matchId:
+                          e.target.value,
+                        playerId: "",
+                      })
+                    )
                   }
-                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none"
+                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-sm font-black uppercase outline-none sm:text-base"
                 >
-                  <option value="">SELECT MATCH</option>
+                  <option value="">
+                    SELECT MATCH
+                  </option>
 
                   {matches
                     .filter(
-                      (match) => match.status !== "CANCELLED"
+                      (match) =>
+                        match.status !==
+                        "CANCELLED"
                     )
                     .map((match) => (
-                      <option key={match.id} value={match.id}>
-                        #{match.id} — {match.sportName} —{" "}
-                        {match.teamAName} vs {match.teamBName}
+                      <option
+                        key={match.id}
+                        value={match.id}
+                      >
+                        #{match.id} —{" "}
+                        {match.sportName} —{" "}
+                        {match.teamAName} vs{" "}
+                        {match.teamBName}
                       </option>
                     ))}
                 </select>
               </div>
 
               {selectedMatch && (
-                <div className="border-2 border-[#063b32] bg-[#104c41] p-5 text-[#fff7e8]">
+                <div className="border-2 border-[#063b32] bg-[#104c41] p-5 text-[#fff7e8] sm:p-6">
                   <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-70">
                     Selected Match
                   </p>
 
-                  <p className="mt-2 text-xl font-black uppercase">
-                    {selectedMatch.teamAName} vs{" "}
-                    {selectedMatch.teamBName}
+                  <p className="mt-2 break-words text-xl font-black uppercase sm:text-2xl">
+                    {
+                      selectedMatch.teamAName
+                    }{" "}
+                    vs{" "}
+                    {
+                      selectedMatch.teamBName
+                    }
                   </p>
 
-                  <p className="mt-2 text-sm font-bold uppercase opacity-70">
-                    {selectedMatch.sportName}
-                    {selectedMatch.roundName
-                      ? ` · ${selectedMatch.roundName}`
-                      : ""}
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs font-bold uppercase opacity-70 sm:text-sm">
+                    <span>
+                      {
+                        selectedMatch.sportName
+                      }
+                    </span>
+
+                    {selectedMatch.roundName && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          {
+                            selectedMatch.roundName
+                          }
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <p className="mt-3 flex items-center gap-2 text-xs font-semibold opacity-65 sm:text-sm">
+                    <CalendarDays
+                      size={15}
+                    />
+                    {formatDate(
+                      selectedMatch.scheduledAt
+                    )}
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="text-sm font-black uppercase tracking-[0.14em]">
+                <label className="text-xs font-black uppercase tracking-[0.14em] sm:text-sm">
                   Player
                 </label>
 
                 <select
                   value={form.playerId}
                   onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      playerId: e.target.value,
-                    }))
+                    setForm(
+                      (current) => ({
+                        ...current,
+                        playerId:
+                          e.target.value,
+                      })
+                    )
                   }
                   disabled={!form.matchId}
-                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-base font-black uppercase outline-none disabled:opacity-50"
+                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-sm font-black uppercase outline-none disabled:opacity-50 sm:text-base"
                 >
                   <option value="">
                     {form.matchId
@@ -948,35 +971,43 @@ export default function AdminStatsPage() {
                       : "SELECT MATCH FIRST"}
                   </option>
 
-                  {playersForSelectedMatch.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name} —{" "}
-                      {player.teamName ??
-                        player.team?.name ??
-                        "No Team"}
-                    </option>
-                  ))}
+                  {playersForSelectedMatch.map(
+                    (player) => (
+                      <option
+                        key={player.id}
+                        value={player.id}
+                      >
+                        {player.name} —{" "}
+                        {player.teamName ||
+                          "No Team"}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
               <div>
-                <label className="text-sm font-black uppercase tracking-[0.14em]">
+                <label className="text-xs font-black uppercase tracking-[0.14em] sm:text-sm">
                   Stat Type
                 </label>
 
                 <input
                   value={form.statType}
                   onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      statType: e.target.value,
-                    }))
+                    setForm(
+                      (current) => ({
+                        ...current,
+                        statType:
+                          e.target.value,
+                      })
+                    )
                   }
                   placeholder={
                     selectedMatch
                       ? sports.find(
                           (sport) =>
-                            sport.id === selectedMatch.sportId
+                            sport.id ===
+                            selectedMatch.sportId
                         )?.primaryStat ||
                         "Goals / Runs / Points"
                       : "Goals / Runs / Points"
@@ -985,18 +1016,20 @@ export default function AdminStatsPage() {
                 />
 
                 {selectedMatch && (
-                  <p className="mt-2 text-sm font-semibold opacity-55">
+                  <p className="mt-2 break-words text-xs font-semibold opacity-55 sm:text-sm">
                     Primary stat for this sport:{" "}
                     {sports.find(
                       (sport) =>
-                        sport.id === selectedMatch.sportId
-                    )?.primaryStat || "Not configured"}
+                        sport.id ===
+                        selectedMatch.sportId
+                    )?.primaryStat ||
+                      "Not configured"}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="text-sm font-black uppercase tracking-[0.14em]">
+                <label className="text-xs font-black uppercase tracking-[0.14em] sm:text-sm">
                   Value
                 </label>
 
@@ -1005,29 +1038,33 @@ export default function AdminStatsPage() {
                   min={0}
                   value={form.value}
                   onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      value: Math.max(
-                        0,
-                        Number(e.target.value)
-                      ),
-                    }))
+                    setForm(
+                      (current) => ({
+                        ...current,
+                        value: Math.max(
+                          0,
+                          Number(
+                            e.target.value
+                          )
+                        ),
+                      })
+                    )
                   }
-                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-3xl font-black outline-none"
+                  className="mt-2 w-full border-2 border-[#063b32] bg-[#fbf5e8] px-4 py-4 text-3xl font-black outline-none sm:text-4xl"
                 />
               </div>
 
               {error && (
-                <div className="border-2 border-[#063b32] bg-[#e85a4f] px-5 py-4 text-base font-bold text-[#fff7e8]">
+                <div className="break-words border-2 border-[#063b32] bg-[#e85a4f] px-4 py-4 text-sm font-bold text-[#fff7e8] sm:px-5 sm:text-base">
                   {error}
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="grid gap-3 pt-2 sm:grid-cols-2">
                 <button
                   onClick={closeModal}
                   disabled={saving}
-                  className="flex-1 border-2 border-[#063b32] bg-[#d9cebb] px-5 py-4 text-base font-black uppercase shadow-[4px_4px_0_#063b32] disabled:opacity-50"
+                  className="border-2 border-[#063b32] bg-[#d9cebb] px-5 py-4 text-base font-black uppercase shadow-[4px_4px_0_#063b32] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1035,13 +1072,13 @@ export default function AdminStatsPage() {
                 <button
                   onClick={saveStat}
                   disabled={saving}
-                  className="flex-1 border-2 border-[#063b32] bg-[#104c41] px-5 py-4 text-base font-black uppercase text-[#fff7e8] shadow-[4px_4px_0_#063b32] disabled:opacity-50"
+                  className="border-2 border-[#063b32] bg-[#104c41] px-5 py-4 text-base font-black uppercase text-[#fff7e8] shadow-[4px_4px_0_#063b32] disabled:opacity-50"
                 >
                   {saving
                     ? "Saving..."
                     : editingStat
-                    ? "Save Changes"
-                    : "Add Stat"}
+                      ? "Save Changes"
+                      : "Add Stat"}
                 </button>
               </div>
             </div>

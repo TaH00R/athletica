@@ -3,14 +3,22 @@ import type {
   LeaderboardEntry,
   LoginRequest,
   Match,
+  MatchCreateRequest,
+  MatchScoreRequest,
+  MatchStatusRequest,
   Player,
   PlayerStat,
+  PlayerStatRequest,
   Sport,
+  SportRequest,
   Standing,
   Team,
+  TeamRequest,
 } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6967";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:6967";
 
 export class ApiError extends Error {
   status: number;
@@ -22,7 +30,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     cache: "no-store",
@@ -34,8 +45,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const message = await response.text();
+
     throw new ApiError(
-      message || `Request failed with status ${response.status}`,
+      message ||
+        `Request failed with status ${response.status}`,
       response.status
     );
   }
@@ -47,13 +60,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function adminRequest<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("admin_token")
+      : null;
+
+  return request<T>(path, {
+    ...options,
+    headers: {
+      ...(token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : {}),
+      ...options.headers,
+    },
+  });
+}
+
 function encode(value: string | number): string {
   return encodeURIComponent(String(value));
 }
 
 export const api = {
   auth: {
-    login(requestBody: LoginRequest): Promise<AuthResponse> {
+    login(
+      requestBody: LoginRequest
+    ): Promise<AuthResponse> {
       return request<AuthResponse>("/api/auth/login", {
         method: "POST",
         headers: {
@@ -74,7 +111,44 @@ export const api = {
     },
 
     getById(id: number): Promise<Sport> {
-      return request<Sport>(`/api/sports/${encode(id)}`);
+      return request<Sport>(
+        `/api/sports/${encode(id)}`
+      );
+    },
+
+    create(body: SportRequest): Promise<Sport> {
+      return adminRequest<Sport>("/api/sports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    update(
+      id: number,
+      body: SportRequest
+    ): Promise<Sport> {
+      return adminRequest<Sport>(
+        `/api/sports/${encode(id)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    delete(id: number): Promise<void> {
+      return adminRequest<void>(
+        `/api/sports/${encode(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
     },
   },
 
@@ -84,11 +158,50 @@ export const api = {
     },
 
     getById(id: number): Promise<Team> {
-      return request<Team>(`/api/teams/${encode(id)}`);
+      return request<Team>(
+        `/api/teams/${encode(id)}`
+      );
     },
 
     getBySport(sportId: number): Promise<Team[]> {
-      return request<Team[]>(`/api/teams/sport/${encode(sportId)}`);
+      return request<Team[]>(
+        `/api/teams/sport/${encode(sportId)}`
+      );
+    },
+
+    create(body: TeamRequest): Promise<Team> {
+      return adminRequest<Team>("/api/teams", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    update(
+      id: number,
+      body: TeamRequest
+    ): Promise<Team> {
+      return adminRequest<Team>(
+        `/api/teams/${encode(id)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    delete(id: number): Promise<void> {
+      return adminRequest<void>(
+        `/api/teams/${encode(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
     },
   },
 
@@ -98,15 +211,62 @@ export const api = {
     },
 
     getById(id: number): Promise<Player> {
-      return request<Player>(`/api/players/${encode(id)}`);
+      return request<Player>(
+        `/api/players/${encode(id)}`
+      );
     },
 
     getByTeam(teamId: number): Promise<Player[]> {
-      return request<Player[]>(`/api/players/team/${encode(teamId)}`);
+      return request<Player[]>(
+        `/api/players/team/${encode(teamId)}`
+      );
     },
 
     getActiveByTeam(teamId: number): Promise<Player[]> {
-      return request<Player[]>(`/api/players/team/${encode(teamId)}/active`);
+      return request<Player[]>(
+        `/api/players/team/${encode(teamId)}/active`
+      );
+    },
+
+    create(body: {
+      name: string;
+      teamId: number;
+    }): Promise<Player> {
+      return adminRequest<Player>("/api/players", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    update(
+      id: number,
+      body: {
+        name: string;
+        teamId: number;
+      }
+    ): Promise<Player> {
+      return adminRequest<Player>(
+        `/api/players/${encode(id)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    delete(id: number): Promise<void> {
+      return adminRequest<void>(
+        `/api/players/${encode(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
     },
   },
 
@@ -116,7 +276,9 @@ export const api = {
     },
 
     getById(id: number): Promise<Match> {
-      return request<Match>(`/api/matches/${encode(id)}`);
+      return request<Match>(
+        `/api/matches/${encode(id)}`
+      );
     },
 
     getLive(): Promise<Match[]> {
@@ -132,65 +294,209 @@ export const api = {
     },
 
     getBySport(sportId: number): Promise<Match[]> {
-      return request<Match[]>(`/api/matches/sport/${encode(sportId)}`);
+      return request<Match[]>(
+        `/api/matches/sport/${encode(sportId)}`
+      );
     },
 
-    getLiveBySport(sportId: number): Promise<Match[]> {
-      return request<Match[]>(`/api/matches/sport/${encode(sportId)}/live`);
+    getLiveBySport(
+      sportId: number
+    ): Promise<Match[]> {
+      return request<Match[]>(
+        `/api/matches/sport/${encode(
+          sportId
+        )}/live`
+      );
+    },
+
+    create(
+      body: MatchCreateRequest
+    ): Promise<Match> {
+      return adminRequest<Match>("/api/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    update(
+      id: number,
+      body: MatchCreateRequest
+    ): Promise<Match> {
+      return adminRequest<Match>(
+        `/api/matches/${encode(id)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    updateScore(
+      id: number,
+      body: MatchScoreRequest
+    ): Promise<Match> {
+      return adminRequest<Match>(
+        `/api/matches/${encode(id)}/score`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    updateStatus(
+      id: number,
+      body: MatchStatusRequest
+    ): Promise<Match> {
+      return adminRequest<Match>(
+        `/api/matches/${encode(id)}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    delete(id: number): Promise<void> {
+      return adminRequest<void>(
+        `/api/matches/${encode(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
     },
   },
 
   stats: {
     getAll(): Promise<PlayerStat[]> {
-      return request<PlayerStat[]>("/api/player-stats");
+      return request<PlayerStat[]>(
+        "/api/player-stats"
+      );
     },
 
     getById(id: number): Promise<PlayerStat> {
-      return request<PlayerStat>(`/api/player-stats/${encode(id)}`);
+      return request<PlayerStat>(
+        `/api/player-stats/${encode(id)}`
+      );
     },
 
-    getByPlayer(playerId: number): Promise<PlayerStat[]> {
-      return request<PlayerStat[]>(`/api/player-stats/player/${encode(playerId)}`);
-    },
-
-    getByMatch(matchId: number): Promise<PlayerStat[]> {
-      return request<PlayerStat[]>(`/api/player-stats/match/${encode(matchId)}`);
-    },
-
-    getByMatchAndType(matchId: number, statType: string): Promise<PlayerStat[]> {
+    getByPlayer(
+      playerId: number
+    ): Promise<PlayerStat[]> {
       return request<PlayerStat[]>(
-        `/api/player-stats/match/${encode(matchId)}/type/${encode(statType)}`
+        `/api/player-stats/player/${encode(
+          playerId
+        )}`
+      );
+    },
+
+    getByMatch(
+      matchId: number
+    ): Promise<PlayerStat[]> {
+      return request<PlayerStat[]>(
+        `/api/player-stats/match/${encode(
+          matchId
+        )}`
+      );
+    },
+
+    getByMatchAndType(
+      matchId: number,
+      statType: string
+    ): Promise<PlayerStat[]> {
+      return request<PlayerStat[]>(
+        `/api/player-stats/match/${encode(
+          matchId
+        )}/type/${encode(statType)}`
+      );
+    },
+
+    create(
+      body: PlayerStatRequest
+    ): Promise<PlayerStat> {
+      return adminRequest<PlayerStat>(
+        "/api/player-stats",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    },
+
+    delete(id: number): Promise<void> {
+      return adminRequest<void>(
+        `/api/player-stats/${encode(id)}`,
+        {
+          method: "DELETE",
+        }
       );
     },
   },
 
   standings: {
-    getBySport(sportId: number): Promise<Standing[]> {
-      return request<Standing[]>(`/api/standings/${encode(sportId)}`);
+    getBySport(
+      sportId: number
+    ): Promise<Standing[]> {
+      return request<Standing[]>(
+        `/api/standings/${encode(sportId)}`
+      );
     },
   },
 
   leaderboards: {
-    getBySport(sportId: number): Promise<LeaderboardEntry[]> {
-      return request<LeaderboardEntry[]>(`/api/leaderboards/${encode(sportId)}`);
+    getBySport(
+      sportId: number
+    ): Promise<LeaderboardEntry[]> {
+      return request<LeaderboardEntry[]>(
+        `/api/leaderboards/${encode(sportId)}`
+      );
     },
 
     getTop(
       sportId: number,
-      options: { statType?: string; limit?: number } = {}
+      options: {
+        statType?: string;
+        limit?: number;
+      } = {}
     ): Promise<LeaderboardEntry[]> {
       const params = new URLSearchParams();
 
       if (options.statType) {
-        params.set("statType", options.statType);
+        params.set(
+          "statType",
+          options.statType
+        );
       }
 
       if (options.limit !== undefined) {
-        params.set("limit", String(options.limit));
+        params.set(
+          "limit",
+          String(options.limit)
+        );
       }
 
       const query = params.toString();
-      const path = `/api/leaderboards/${encode(sportId)}/top${query ? `?${query}` : ""}`;
+
+      const path =
+        `/api/leaderboards/${encode(
+          sportId
+        )}/top` +
+        (query ? `?${query}` : "");
 
       return request<LeaderboardEntry[]>(path);
     },

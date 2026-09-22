@@ -21,3 +21,24 @@ export type Match = {
   winnerId: number | null;
   winnerName: string | null;
 };
+
+export type MatchCreateRequest = {
+  sportId: number;
+  teamAId: number;
+  teamBId: number;
+  scoreA: number;
+  scoreB: number;
+  venue: string | null;
+  roundName: string | null;
+  scheduledAt: string;
+  status: MatchStatus;
+};
+
+export type MatchScoreRequest = {
+  scoreA: number;
+  scoreB: number;
+};
+
+export type MatchStatusRequest = {
+  status: MatchStatus;
+};
