@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -63,15 +64,23 @@ export default function AdminLogin() {
     <main className="min-h-screen bg-[#063b32] text-[#f4f0e5]">
       <div className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
 
+        {/* ==================== HEADER ==================== */}
+
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
+
           <Link
             href="/"
             className="flex items-center gap-3"
           >
-            <div className="flex h-11 w-11 items-center justify-center border border-[#ff625b] text-[#ff625b] sm:h-12 sm:w-12">
-              <span className="text-2xl">
-                ✣
-              </span>
+            {/* Sports Board Logo */}
+            <div className="relative h-12 w-16 shrink-0 sm:h-14 sm:w-20">
+              <Image
+                src="/images/logo.jpg"
+                alt="Sports Board Logo"
+                fill
+                priority
+                className="object-contain"
+              />
             </div>
 
             <div>
@@ -80,7 +89,7 @@ export default function AdminLogin() {
               </div>
 
               <div className="mono-font mt-1 text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
-                Freshers' Cup 2026
+                Freshers&apos; Cup 2026
               </div>
             </div>
           </Link>
@@ -92,6 +101,8 @@ export default function AdminLogin() {
             ← Back Home
           </Link>
         </div>
+
+        {/* ==================== LOGIN CONTENT ==================== */}
 
         <div className="mx-auto flex min-h-[calc(100vh-120px)] max-w-[1600px] items-center justify-center">
           <div className="w-full max-w-[480px]">
@@ -111,6 +122,8 @@ export default function AdminLogin() {
               </p>
             </div>
 
+            {/* ==================== LOGIN FORM ==================== */}
+
             <form
               onSubmit={handleSubmit}
               className="relative border border-white/25 bg-[#0a443a] p-6 shadow-[7px_7px_0_#041f1b] sm:p-8"
@@ -124,6 +137,8 @@ export default function AdminLogin() {
               <span className="absolute bottom-0 right-0 h-5 w-5 border-b-2 border-r-2 border-[#ff625b]" />
 
               <div className="space-y-6">
+
+                {/* USERNAME */}
 
                 <div>
                   <label
@@ -147,6 +162,8 @@ export default function AdminLogin() {
                   />
                 </div>
 
+                {/* PASSWORD */}
+
                 <div>
                   <label
                     htmlFor="password"
@@ -169,18 +186,24 @@ export default function AdminLogin() {
                   />
                 </div>
 
+                {/* ERROR */}
+
                 {error && (
                   <div className="border border-[#ff625b]/50 bg-[#ff625b]/10 px-4 py-3 text-sm font-semibold text-[#ff8b86]">
                     {error}
                   </div>
                 )}
 
+                {/* SUBMIT */}
+
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full border-2 border-black bg-[#ff625b] px-5 py-4 text-sm font-black uppercase tracking-wide text-black shadow-[5px_5px_0_#041f1b] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Signing In..." : "Enter Dashboard →"}
+                  {loading
+                    ? "Signing In..."
+                    : "Enter Dashboard →"}
                 </button>
               </div>
             </form>

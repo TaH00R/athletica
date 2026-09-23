@@ -84,6 +84,7 @@ export default function AdminDashboard({
         <aside className="fixed inset-y-0 left-0 z-50 hidden w-[260px] border-r border-white/10 bg-[#042e28] lg:flex lg:flex-col">
           <div className="border-b border-white/10 px-7 py-6">
             <Link href="/admin/dashboard">
+            
               <div className="display-font text-2xl">
                 SPARK
               </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -18,17 +19,23 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="relative z-50 border-b border-white/15 bg-[#063b32]">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/15 bg-[#063b32]/95 backdrop-blur-md">
       <div className="mx-auto flex h-[82px] max-w-[1600px] items-center justify-between px-5 sm:px-8 lg:h-[88px] lg:px-10">
+
+        {/* Logo */}
 
         <Link
           href="/"
           className="flex shrink-0 items-center gap-3"
         >
-          <div className="flex h-12 w-12 items-center justify-center border border-[#ff625b] text-[#ff625b]">
-            <span className="text-2xl leading-none">
-              ✣
-            </span>
+          <div className="relative h-20 w-12">
+            <Image
+              src="/images/logo.jpg"
+              alt="Sports Board Logo"
+              fill
+              priority
+              className="object-contain"
+            />
           </div>
 
           <div className="flex flex-col leading-none">
@@ -37,6 +44,8 @@ export default function Navbar() {
             </span>
           </div>
         </Link>
+
+        {/* Desktop Navigation */}
 
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 lg:flex xl:gap-10">
           {links.map((link) => (
@@ -50,6 +59,8 @@ export default function Navbar() {
           ))}
         </nav>
 
+        {/* Right Side */}
+
         <div className="flex items-center gap-3">
 
           <Link
@@ -58,6 +69,8 @@ export default function Navbar() {
           >
             Admin Login →
           </Link>
+
+          {/* Mobile Menu Button */}
 
           <button
             type="button"
@@ -72,9 +85,10 @@ export default function Navbar() {
               <Menu size={22} />
             )}
           </button>
-
         </div>
       </div>
+
+      {/* Mobile Menu */}
 
       {menuOpen && (
         <div className="border-t border-white/10 bg-[#042e28] lg:hidden">
