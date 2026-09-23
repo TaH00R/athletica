@@ -1,6 +1,6 @@
-# Freshers' Cup
+# Spark
 
-Freshers' Cup is a full-stack sports management and live-score website for IIIT Guwahati.
+Spark is a full-stack sports management and live-score website for IIIT Guwahati.
 
 The project is split into:
 
@@ -38,7 +38,7 @@ The project is split into:
 A typical layout is:
 
 ```text
-freshers-cup/
+spark/
 ├── backend/
 │   ├── src/
 │   ├── pom.xml
@@ -102,13 +102,13 @@ Create a PostgreSQL database.
 Using `psql`:
 
 ```sql
-CREATE DATABASE freshers_cup;
+CREATE DATABASE spark;
 ```
 
 Then connect to it:
 
 ```bash
-psql -U postgres -d freshers_cup
+psql -U postgres -d spark
 ```
 
 You can also use pgAdmin.
@@ -118,7 +118,7 @@ You can also use pgAdmin.
 You will need:
 
 ```text
-Database name: freshers_cup
+Database name: spark
 Username: postgres
 Password: <your-postgres-password>
 Host: localhost
@@ -149,7 +149,7 @@ FRONTEND_URL
 Example local values:
 
 ```text
-DB_URL=jdbc:postgresql://localhost:5432/freshers_cup
+DB_URL=jdbc:postgresql://localhost:5432/spark
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
 
@@ -176,7 +176,7 @@ Use environment-variable placeholders so the same application can run locally an
 Example:
 
 ```properties
-spring.application.name=freshers-cup-backend
+spring.application.name=backend
 
 server.port=${PORT:6967}
 
@@ -185,7 +185,7 @@ spring.datasource.username=${DB_USERNAME}
 spring.datasource.password=${DB_PASSWORD}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.hibernate.ddl-auto=auto
 spring.jpa.open-in-view=false
 
 spring.flyway.enabled=true
@@ -228,7 +228,7 @@ Set the variables in your shell before starting Spring Boot.
 ### Windows PowerShell
 
 ```powershell
-$env:DB_URL="jdbc:postgresql://localhost:5432/freshers_cup"
+$env:DB_URL="jdbc:postgresql://localhost:5432/spark"
 $env:DB_USERNAME="postgres"
 $env:DB_PASSWORD="your_password"
 $env:JWT_SECRET="your_long_random_secret"
@@ -689,7 +689,7 @@ Start PostgreSQL.
 Create the database:
 
 ```sql
-CREATE DATABASE freshers_cup;
+CREATE DATABASE spark;
 ```
 
 Start the backend:
@@ -807,13 +807,13 @@ Convert those values into the JDBC URL expected by Spring Boot.
 Example:
 
 ```text
-jdbc:postgresql://db.example.com:5432/freshers_cup
+jdbc:postgresql://db.example.com:5432/spark
 ```
 
 Set:
 
 ```text
-DB_URL=jdbc:postgresql://db.example.com:5432/freshers_cup
+DB_URL=jdbc:postgresql://db.example.com:5432/spark
 DB_USERNAME=<username>
 DB_PASSWORD=<password>
 ```
@@ -984,7 +984,7 @@ Good:
 Example:
 
 ```env
-DB_URL=jdbc:postgresql://localhost:5432/freshers_cup
+DB_URL=jdbc:postgresql://localhost:5432/spark
 DB_USERNAME=postgres
 DB_PASSWORD=
 JWT_SECRET=
@@ -1338,14 +1338,14 @@ Keep API types and API request code centralized.
 For someone who already has the repository:
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd freshers-cup
+git clone https://github.com/TaH00R/spark
+cd spark
 ```
 
 Create the PostgreSQL database:
 
 ```sql
-CREATE DATABASE freshers_cup;
+CREATE DATABASE spark;
 ```
 
 Configure backend environment variables:
