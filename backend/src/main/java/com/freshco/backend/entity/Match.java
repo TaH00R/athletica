@@ -30,11 +30,11 @@ public class Match {
     @JoinColumn(name = "team_b_id", nullable = false)
     private Team teamB;
 
-    @Column(nullable = false)
+    @Column(name = "score_a", nullable = false)
     @Builder.Default
     private String scoreA = "0";
 
-    @Column(nullable = false)
+    @Column(name = "score_b", nullable = false)
     @Builder.Default
     private String scoreB = "0";
 
