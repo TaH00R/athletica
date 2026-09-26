@@ -27,7 +27,7 @@ export default async function MatchesPage() {
   );
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#063b32] text-[#f4f0e5]">
+    <main className="min-h-screen overflow-x-hidden bg-[#063b32] pt-20 text-[#f4f0e5]">
       <Navbar />
 
       <section className="border-b border-white/10">

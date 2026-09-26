@@ -23,7 +23,7 @@ export default async function PlayersPage() {
   const teamGroups = Object.entries(groupedPlayers);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#063b32] text-[#f4f0e5]">
+    <main className="min-h-screen overflow-x-hidden bg-[#063b32] pt-20 text-[#f4f0e5]">
       <Navbar />
 
       <section className="border-b border-white/10">

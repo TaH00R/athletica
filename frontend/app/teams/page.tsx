@@ -6,24 +6,25 @@ import { api } from "@/lib/api";
 export default async function TeamsPage() {
   const teams = await api.teams.getAll();
 
-  const groupedTeams = teams.reduce<
-    Record<string, typeof teams>
-  >((groups, team) => {
-    const sportName = team.sportName || "Other";
+  const groupedTeams = teams.reduce<Record<string, typeof teams>>(
+    (groups, team) => {
+      const sportName = team.sportName || "Other";
 
-    if (!groups[sportName]) {
-      groups[sportName] = [];
-    }
+      if (!groups[sportName]) {
+        groups[sportName] = [];
+      }
 
-    groups[sportName].push(team);
+      groups[sportName].push(team);
 
-    return groups;
-  }, {});
+      return groups;
+    },
+    {},
+  );
 
   const sportGroups = Object.entries(groupedTeams);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#063b32] text-[#f4f0e5]">
+    <main className="min-h-screen overflow-x-hidden bg-[#063b32] pt-20 text-[#f4f0e5]">
       <Navbar />
 
       <section className="border-b border-white/10">
@@ -39,8 +40,8 @@ export default async function TeamsPage() {
               </h1>
 
               <p className="mono-font mt-6 max-w-xl text-sm leading-7 text-white/65 sm:text-base">
-                Every sport needs a squad. Meet the teams competing
-                across the Freshers&apos; Cup.
+                Every sport needs a squad. Meet the teams competing across the
+                Freshers&apos; Cup.
               </p>
             </div>
 
@@ -67,7 +68,7 @@ export default async function TeamsPage() {
                         {sportTeams.length === 1 ? "TEAM" : "TEAMS"}
                       </p>
 
-                      <h2 className="display-font text-4xl leading-none uppercase sm:text-5xl">
+                      <h2 className="display-font text-4xl uppercase leading-none sm:text-5xl">
                         {sportName}
                       </h2>
                     </div>

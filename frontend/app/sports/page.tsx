@@ -11,7 +11,7 @@ export default async function SportsPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#063b32] text-[#f4f0e5]">
+    <main className="min-h-screen overflow-x-hidden bg-[#063b32] pt-20 text-[#f4f0e5]">
         <Navbar />
 
       <section>
